@@ -1,21 +1,16 @@
-# Root .gitignore for PlayPod
-# Logs
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
-# Node dependencies and build outputs
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
 
-# Frontend environment files
 /frontend/.env
 /frontend/.env.local
 
-# Python caches and environments
 backend/**/__pycache__/
 backend/**/*.py[cod]
 backend/**/playpod.db
@@ -24,7 +19,6 @@ venv/
 .env
 .env.*
 
-# Editor and OS files
 .vscode/
 .idea/
 .DS_Store
