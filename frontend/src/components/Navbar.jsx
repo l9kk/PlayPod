@@ -16,6 +16,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
+import authService from '../services/authService';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -64,6 +65,7 @@ const StyledAppBar = styled(AppBar)(({ theme }) => ({
 
 function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState('');
   const [anchorEl, setAnchorEl] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -71,10 +73,23 @@ function Navbar() {
   const isSearchPage = location.pathname === '/search';
 
   useEffect(() => {
-    const user = localStorage.getItem('user');
-    if (user) {
-      setIsLoggedIn(true);
-    }
+    const checkLoginStatus = () => {
+      const loggedIn = authService.isLoggedIn();
+      setIsLoggedIn(loggedIn);
+      
+      if (loggedIn) {
+        const user = authService.getCurrentUser();
+        setUsername(user?.username || '');
+      }
+    };
+    
+    checkLoginStatus();
+    
+    window.addEventListener('storage', checkLoginStatus);
+    
+    return () => {
+      window.removeEventListener('storage', checkLoginStatus);
+    };
   }, []);
 
   const handleMenu = (event) => {
@@ -93,10 +108,11 @@ function Navbar() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
+    authService.logout();
     setIsLoggedIn(false);
+    setUsername('');
+    navigate('/');
     handleClose();
-    navigate('/login');
   };
 
   return (
@@ -151,7 +167,7 @@ function Navbar() {
                     bgcolor: 'primary.dark',
                   }}
                 >
-                  {JSON.parse(localStorage.getItem('user'))?.username?.charAt(0).toUpperCase() || 'U'}
+                  {username?.charAt(0).toUpperCase() || 'U'}
                 </Avatar>
               </IconButton>
               <Menu

@@ -152,7 +152,19 @@ function AlbumDetail({ setCurrentTrack }) {
                 <IconButton 
                   edge="end" 
                   aria-label="play" 
-                  onClick={() => handlePlayTrack(track)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePlayTrack(track);
+                  }}
+                  sx={{ 
+                    '&:hover': { 
+                      color: 'primary.main',
+                      transform: 'scale(1.1)'
+                    },
+                    '&:active': {
+                      transform: 'scale(0.95)'
+                    }
+                  }}
                 >
                   <PlayArrowIcon />
                 </IconButton>

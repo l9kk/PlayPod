@@ -24,6 +24,9 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import LaunchIcon from '@mui/icons-material/Launch';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
+import LoginModal from './LoginModal';
+import apiService from '../services/api';
+import authService from '../services/authService';
 
 const drawerWidth = 240;
 
@@ -95,6 +98,10 @@ const PlayButton = styled(IconButton)(({ theme }) => ({
     boxShadow: '0 6px 12px rgba(29, 185, 84, 0.4)',
     backgroundColor: theme.palette.primary.dark,
   },
+  '&:active': {
+    transform: 'scale(0.95)',
+  },
+  zIndex: 10,
 }));
 
 function MusicPlayer({ track }) {
@@ -103,6 +110,7 @@ function MusicPlayer({ track }) {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(70);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
   const navigate = useNavigate();
   
   const audioRef = useRef(null);
@@ -110,6 +118,10 @@ function MusicPlayer({ track }) {
   useEffect(() => {
     if (track) {
       localStorage.setItem('currentTrack', JSON.stringify(track));
+      
+      if (!isPlaying) {
+        apiService.addToHistory(track);
+      }
       
       setIsPlaying(false);
       setCurrentTime(0);
@@ -122,8 +134,18 @@ function MusicPlayer({ track }) {
       audioRef.current.addEventListener('loadedmetadata', setupAudio);
       audioRef.current.addEventListener('timeupdate', updateTime);
       
-      const favorites = JSON.parse(localStorage.getItem('favorites')) || [];
-      setIsFavorite(favorites.some(fav => fav.id === track.id));
+      const checkFavoriteStatus = async () => {
+        try {
+          if (authService.isLoggedIn()) {
+            const isFav = await apiService.checkFavorite(track.id);
+            setIsFavorite(isFav);
+          }
+        } catch (error) {
+          console.error("Error checking favorite status:", error);
+        }
+      };
+      
+      checkFavoriteStatus();
       
       return () => {
         if (audioRef.current) {
@@ -179,20 +201,37 @@ function MusicPlayer({ track }) {
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  const toggleFavorite = () => {
+  const toggleFavorite = async () => {
     if (!track) return;
     
-    const favorites = JSON.parse(localStorage.getItem('favorites')) || [];
-    
-    if (isFavorite) {
-      const updatedFavorites = favorites.filter(fav => fav.id !== track.id);
-      localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
-    } else {
-      const updatedFavorites = [...favorites, track];
-      localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
+    if (!authService.isLoggedIn()) {
+      setLoginModalOpen(true);
+      return;
     }
     
-    setIsFavorite(!isFavorite);
+    try {
+      if (isFavorite) {
+        await apiService.removeFavorite(track.id);
+      } else {
+        await apiService.addFavorite(track);
+      }
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
+  };
+
+  const handleLoginModalClose = async (success) => {
+    setLoginModalOpen(false);
+    
+    if (success && track) {
+      try {
+        await apiService.addFavorite(track);
+        setIsFavorite(true);
+      } catch (error) {
+        console.error("Error adding to favorites after login:", error);
+      }
+    }
   };
 
   const openFullPlayer = () => {
@@ -204,172 +243,179 @@ function MusicPlayer({ track }) {
   const progressPercentage = (currentTime / duration) * 100 || 0;
 
   return (
-    <Fade in={true} timeout={300}>
-      <PlayerCard>
-        <Box sx={{ position: 'relative' }}>
-          {/* Progress bar*/}
-          <Box sx={{ 
-            position: 'absolute', 
-            top: -8,
-            left: 0,
-            right: 0,
-            height: 4,
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            borderRadius: 2,
-          }}>
+    <>
+      <Fade in={true} timeout={300}>
+        <PlayerCard>
+          <Box sx={{ position: 'relative' }}>
             <Box sx={{ 
-              height: '100%', 
-              width: `${progressPercentage}%`, 
-              backgroundColor: 'primary.main',
+              position: 'absolute', 
+              top: -8,
+              left: 0,
+              right: 0,
+              height: 4,
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
               borderRadius: 2,
-              transition: 'width 0.1s linear',
-              boxShadow: '0 0 8px rgba(29, 185, 84, 0.5)',
-            }} />
-          </Box>
-        
-          <Grid container spacing={2} alignItems="center">
-            {/* Track Info */}
-            <Grid item xs={12} sm={3} sx={{ display: 'flex', alignItems: 'center' }}>
+            }}>
               <Box sx={{ 
-                position: 'relative',
+                height: '100%', 
+                width: `${progressPercentage}%`, 
+                backgroundColor: 'primary.main',
                 borderRadius: 2,
-                overflow: 'hidden',
-                boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
-                mr: 2,
-                width: 55,
-                height: 55,
-              }}>
-                <CardMedia
-                  component="img"
-                  sx={{ width: 55, height: 55 }}
-                  image={track.cover_image || '/default-album.png'}
-                  alt={track.title}
-                />
-                {isPlaying && (
-                  <Box sx={{ 
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    py: 0.5,
-                  }}>
-                    <EqualizerIcon 
-                      sx={{ 
-                        fontSize: 16,
-                        color: '#1DB954',
-                        animation: `${pulse} 1.2s ease-in-out infinite`
-                      }}
-                    />
-                  </Box>
-                )}
-              </Box>
-              <Box>
-                <Typography 
-                  variant="subtitle1" 
-                  component="div" 
-                  sx={{ 
-                    fontWeight: 500,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: { xs: '100px', sm: '200px' }
-                  }}
-                >
-                  {track.title}
-                </Typography>
-                <Typography 
-                  variant="caption" 
-                  color="text.secondary"
-                  sx={{ 
-                    fontWeight: 400,
-                    display: 'block',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {track.artist}
-                </Typography>
-              </Box>
-            </Grid>
-            
-            {/* Player Controls */}
-            <Grid item xs={12} sm={5}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Stack direction="row" spacing={1} sx={{ mb: 1.5, alignItems: 'center' }}>
-                  <Tooltip title="Previous">
-                    <ControlButton aria-label="previous" size="small">
-                      <SkipPreviousIcon />
-                    </ControlButton>
-                  </Tooltip>
-                  
-                  <PlayButton 
-                    aria-label="play/pause" 
-                    onClick={handlePlayPause}
+                transition: 'width 0.1s linear',
+                boxShadow: '0 0 8px rgba(29, 185, 84, 0.5)',
+              }} />
+            </Box>
+          
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={3} sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ 
+                  position: 'relative',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
+                  mr: 2,
+                  width: 55,
+                  height: 55,
+                }}>
+                  <CardMedia
+                    component="img"
+                    sx={{ width: 55, height: 55 }}
+                    image={track.cover_image || '/default-album.png'}
+                    alt={track.title}
+                  />
+                  {isPlaying && (
+                    <Box sx={{ 
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      py: 0.5,
+                    }}>
+                      <EqualizerIcon 
+                        sx={{ 
+                          fontSize: 16,
+                          color: '#1DB954',
+                          animation: `${pulse} 1.2s ease-in-out infinite`
+                        }}
+                      />
+                    </Box>
+                  )}
+                </Box>
+                <Box>
+                  <Typography 
+                    variant="subtitle1" 
+                    component="div" 
+                    sx={{ 
+                      fontWeight: 500,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: { xs: '100px', sm: '200px' }
+                    }}
                   >
-                    {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-                  </PlayButton>
-                  
-                  <Tooltip title="Next">
-                    <ControlButton aria-label="next" size="small">
-                      <SkipNextIcon />
-                    </ControlButton>
-                  </Tooltip>
-                </Stack>
-                
-                <Stack direction="row" spacing={1} sx={{ width: '100%', alignItems: 'center' }}>
-                  <Typography variant="caption" sx={{ opacity: 0.8, width: 35, textAlign: 'right' }}>
-                    {formatTime(currentTime)}
+                    {track.title}
                   </Typography>
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary"
+                    sx={{ 
+                      fontWeight: 400,
+                      display: 'block',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {track.artist}
+                  </Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} sm={5}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Stack direction="row" spacing={1} sx={{ mb: 1.5, alignItems: 'center' }}>
+                    <Tooltip title="Previous">
+                      <ControlButton aria-label="previous" size="small">
+                        <SkipPreviousIcon />
+                      </ControlButton>
+                    </Tooltip>
+                    
+                    <PlayButton 
+                      aria-label="play/pause" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePlayPause();
+                      }}
+                    >
+                      {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+                    </PlayButton>
+                    
+                    <Tooltip title="Next">
+                      <ControlButton aria-label="next" size="small">
+                        <SkipNextIcon />
+                      </ControlButton>
+                    </Tooltip>
+                  </Stack>
+                  
+                  <Stack direction="row" spacing={1} sx={{ width: '100%', alignItems: 'center' }}>
+                    <Typography variant="caption" sx={{ opacity: 0.8, width: 35, textAlign: 'right' }}>
+                      {formatTime(currentTime)}
+                    </Typography>
+                    <StyledSlider
+                      size="small"
+                      value={currentTime}
+                      min={0}
+                      max={duration || 100}
+                      onChange={handleTimeChange}
+                      aria-label="time-indicator"
+                    />
+                    <Typography variant="caption" sx={{ opacity: 0.8, width: 35 }}>
+                      {formatTime(duration)}
+                    </Typography>
+                  </Stack>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} sm={4}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
+                  <Tooltip title={isFavorite ? "Remove from favorites" : "Add to favorites"}>
+                    <IconButton onClick={toggleFavorite} sx={{ color: isFavorite ? 'primary.main' : 'inherit' }}>
+                      {isFavorite ? 
+                        <FavoriteIcon sx={{ filter: 'drop-shadow(0 0 3px rgba(29, 185, 84, 0.5))' }} /> : 
+                        <FavoriteBorderIcon />}
+                    </IconButton>
+                  </Tooltip>
+                  <VolumeDownIcon fontSize="small" sx={{ opacity: 0.7 }} />
                   <StyledSlider
                     size="small"
-                    value={currentTime}
-                    min={0}
-                    max={duration || 100}
-                    onChange={handleTimeChange}
-                    aria-label="time-indicator"
+                    value={volume}
+                    aria-label="Volume"
+                    onChange={handleVolumeChange}
                   />
-                  <Typography variant="caption" sx={{ opacity: 0.8, width: 35 }}>
-                    {formatTime(duration)}
-                  </Typography>
+                  <VolumeUpIcon fontSize="small" sx={{ opacity: 0.7 }} />
+                  <Tooltip title="Open full player">
+                    <ControlButton 
+                      aria-label="expand player" 
+                      onClick={openFullPlayer}
+                      sx={{ ml: 1 }}
+                    >
+                      <LaunchIcon fontSize="small" />
+                    </ControlButton>
+                  </Tooltip>
                 </Stack>
-              </Box>
+              </Grid>
             </Grid>
-            
-            {/* Volume Control */}
-            <Grid item xs={12} sm={4}>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
-                <Tooltip title={isFavorite ? "Remove from favorites" : "Add to favorites"}>
-                  <IconButton onClick={toggleFavorite} sx={{ color: isFavorite ? 'primary.main' : 'inherit' }}>
-                    {isFavorite ? 
-                      <FavoriteIcon sx={{ filter: 'drop-shadow(0 0 3px rgba(29, 185, 84, 0.5))' }} /> : 
-                      <FavoriteBorderIcon />}
-                  </IconButton>
-                </Tooltip>
-                <VolumeDownIcon fontSize="small" sx={{ opacity: 0.7 }} />
-                <StyledSlider
-                  size="small"
-                  value={volume}
-                  aria-label="Volume"
-                  onChange={handleVolumeChange}
-                />
-                <VolumeUpIcon fontSize="small" sx={{ opacity: 0.7 }} />
-                <Tooltip title="Open full player">
-                  <ControlButton 
-                    aria-label="expand player" 
-                    onClick={openFullPlayer}
-                    sx={{ ml: 1 }}
-                  >
-                    <LaunchIcon fontSize="small" />
-                  </ControlButton>
-                </Tooltip>
-              </Stack>
-            </Grid>
-          </Grid>
-        </Box>
-      </PlayerCard>
-    </Fade>
+          </Box>
+        </PlayerCard>
+      </Fade>
+
+      <LoginModal 
+        open={loginModalOpen} 
+        onClose={handleLoginModalClose} 
+        actionType="add to favorites"
+      />
+    </>
   );
 }
 

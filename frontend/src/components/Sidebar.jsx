@@ -15,7 +15,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import AlbumIcon from '@mui/icons-material/Album';
 import SearchIcon from '@mui/icons-material/Search';
 import FavoriteIcon from '@mui/icons-material/Favorite';
-import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
+import HistoryIcon from '@mui/icons-material/History';
 import HeadphonesIcon from '@mui/icons-material/Headphones';
 
 const drawerWidth = 240;
@@ -131,7 +131,7 @@ function Sidebar() {
         <List disablePadding>
           {[
             { path: '/favorites', icon: <FavoriteIcon />, text: 'Favorites' },
-            { path: '/create-playlist', icon: <PlaylistAddIcon />, text: 'Create Playlist' },
+            { path: '/history', icon: <HistoryIcon />, text: 'History' },
           ].map((item) => {
             const active = isActive(item.path);
             return (
