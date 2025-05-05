@@ -108,12 +108,62 @@ const apiService = {
     return api.get(`/search?q=${encodeURIComponent(query)}`);
   },
 
-  getLiveTracks: (limit = 10) => api.get(`/deezer/tracks?limit=${limit}`),
-  getLiveTrack: (id) => api.get(`/deezer/tracks/${id}`),
-  getLiveAlbum: (id) => api.get(`/deezer/albums/${id}`),
-  liveSearch: (q, limit = 10) => api.get(`/deezer/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  getLiveTracks: (limit = 10) => {
+    return api.get(`/deezer/tracks?limit=${limit}`)
+      .catch(error => {
+        console.log('Trying alternative tracks endpoint...');
+        if (error.response?.status === 404) {
+          const baseUrl = import.meta.env.VITE_API_URL.replace(/\/api$/, '');
+          return axios.get(`${baseUrl}/deezer/tracks?limit=${limit}`);
+        }
+        throw error;
+      });
+  },
   
-  getGenres: () => api.get('/deezer/genres'),
+  getLiveTrack: (id) => {
+    return api.get(`/deezer/tracks/${id}`)
+      .catch(error => {
+        if (error.response?.status === 404) {
+          const baseUrl = import.meta.env.VITE_API_URL.replace(/\/api$/, '');
+          return axios.get(`${baseUrl}/deezer/tracks/${id}`);
+        }
+        throw error;
+      });
+  },
+  
+  getLiveAlbum: (id) => {
+    return api.get(`/deezer/albums/${id}`)
+      .catch(error => {
+        if (error.response?.status === 404) {
+          const baseUrl = import.meta.env.VITE_API_URL.replace(/\/api$/, '');
+          return axios.get(`${baseUrl}/deezer/albums/${id}`);
+        }
+        throw error;
+      });
+  },
+  
+  liveSearch: (q, limit = 10) => {
+    return api.get(`/deezer/search?q=${encodeURIComponent(q)}&limit=${limit}`)
+      .catch(error => {
+        if (error.response?.status === 404) {
+          const baseUrl = import.meta.env.VITE_API_URL.replace(/\/api$/, '');
+          return axios.get(`${baseUrl}/deezer/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+        }
+        throw error;
+      });
+  },
+  
+  getGenres: () => {
+    return api.get('/deezer/genres')
+      .catch(error => {
+        if (error.response?.status === 404) {
+          const baseUrl = import.meta.env.VITE_API_URL.replace(/\/api$/, '');
+          return axios.get(`${baseUrl}/deezer/genres`);
+        }
+        throw error;
+      });
+  },
+
   getGenreAlbums: (genre, limit = 5) => api.get(`/deezer/genre/${genre}/albums?limit=${limit}`),
   getCustomAlbums: (genre = null, limit = 5) => {
     const params = { limit };

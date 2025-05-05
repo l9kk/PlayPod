@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import tracks, albums, users, search, deezer, favorites, history
-from app.database.database import create_tables
 
 app = FastAPI(
     title="PlayPod API",
