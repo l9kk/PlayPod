@@ -9,9 +9,7 @@ import {
   CardMedia,
   IconButton,
   Link,
-  Divider,
   CircularProgress,
-  Paper,
   Skeleton,
   useTheme,
   Button,
@@ -20,7 +18,6 @@ import {
 import { styled } from '@mui/material/styles';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FeaturedPlayListIcon from '@mui/icons-material/FeaturedPlayList';
-import AlbumIcon from '@mui/icons-material/Album';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import apiService from '../services/api';
 
@@ -61,27 +58,13 @@ const PlayButton = styled(IconButton)(({ theme }) => ({
     backgroundColor: theme.palette.primary.dark,
     transform: 'scale(1.1)',
   },
+  zIndex: 2,
   boxShadow: '0 3px 8px rgba(0, 0, 0, 0.2)',
-}));
-
-const AlbumCard = styled(Card)(({ theme }) => ({
-  transition: 'all 0.3s ease',
-  overflow: 'hidden',
-  height: '100%',
-  '&:hover': {
-    transform: 'translateY(-5px)',
-    '& .MuiCardMedia-root': {
-      transform: 'scale(1.05)',
-    },
-  },
-  '& .MuiCardMedia-root': {
-    transition: 'transform 0.5s ease',
-  },
+  pointerEvents: 'auto',
 }));
 
 function Home({ setCurrentTrack }) {
   const [featuredTracks, setFeaturedTracks] = useState([]);
-  const [recentAlbums, setRecentAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const theme = useTheme();
@@ -89,7 +72,19 @@ function Home({ setCurrentTrack }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const tracksResp = await apiService.getLiveTracks(4);
+        const cachedData = localStorage.getItem('homePageData');
+        const now = new Date().getTime();
+
+        if (cachedData) {
+          const { tracks, timestamp } = JSON.parse(cachedData);
+          if (now - timestamp < 15 * 60 * 1000) {
+            setFeaturedTracks(tracks);
+            setLoading(false);
+            return;
+          }
+        }
+
+        const tracksResp = await apiService.getLiveTracks(8);
         const deezerTracks = tracksResp.data.data;
         const mapped = deezerTracks.map(t => ({
           id: t.id,
@@ -101,9 +96,13 @@ function Home({ setCurrentTrack }) {
           duration: t.duration,
           album_id: t.album.id
         }));
+
+        localStorage.setItem('homePageData', JSON.stringify({
+          tracks: mapped,
+          timestamp: now
+        }));
+
         setFeaturedTracks(mapped);
-        const albumsResp = await apiService.getAlbums();
-        setRecentAlbums(albumsResp.data);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching live data:', err);
@@ -116,6 +115,7 @@ function Home({ setCurrentTrack }) {
   }, []);
 
   const handlePlayTrack = (track) => {
+    apiService.addToHistory(track);
     setCurrentTrack(track);
   };
 
@@ -136,30 +136,9 @@ function Home({ setCurrentTrack }) {
         </SectionTitle>
         
         <Grid container spacing={3}>
-          {[...Array(4)].map((_, index) => (
+          {[...Array(8)].map((_, index) => (
             <Grid item xs={12} sm={6} md={3} key={index}>
               <Skeleton variant="rectangular" height={80} sx={{ borderRadius: 2 }} />
-            </Grid>
-          ))}
-        </Grid>
-        
-        <SectionTitle sx={{ mt: 6 }}>
-          <SectionIcon>
-            <AlbumIcon sx={{ color: 'white' }} />
-          </SectionIcon>
-          <Typography variant="h5" sx={{ fontWeight: 600 }}>
-            Recent Albums
-          </Typography>
-        </SectionTitle>
-        
-        <Grid container spacing={3}>
-          {[...Array(4)].map((_, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <Box sx={{ width: '100%' }}>
-                <Skeleton variant="rectangular" height={180} sx={{ borderRadius: 2, mb: 1 }} />
-                <Skeleton width="70%" height={24} />
-                <Skeleton width="40%" height={20} />
-              </Box>
             </Grid>
           ))}
         </Grid>
@@ -233,7 +212,7 @@ function Home({ setCurrentTrack }) {
           <Button 
             endIcon={<ChevronRightIcon />} 
             component={RouterLink} 
-            to="/search"
+            to="/tracks"
             sx={{ textTransform: 'none' }}
           >
             View all
@@ -272,14 +251,23 @@ function Home({ setCurrentTrack }) {
                       '&:hover': {
                         opacity: 1,
                       },
+                      pointerEvents: 'none', 
+                      zIndex: 1,
                     }}
                   >
-                    <PlayButton
-                      aria-label="play/pause"
-                      onClick={() => handlePlayTrack(track)}
-                    >
-                      <PlayArrowIcon sx={{ height: 38, width: 38 }} />
-                    </PlayButton>
+                    <Box sx={{ pointerEvents: 'auto' }}>
+                      <PlayButton
+                        aria-label="play/pause"
+                        onClick={() => handlePlayTrack(track)}
+                        sx={{ 
+                          '&:active': {
+                            transform: 'scale(0.95)'
+                          }
+                        }}
+                      >
+                        <PlayArrowIcon sx={{ height: 38, width: 38 }} />
+                      </PlayButton>
+                    </Box>
                   </Box>
                   <Box sx={{ 
                     display: 'flex', 
@@ -328,11 +316,18 @@ function Home({ setCurrentTrack }) {
                       <Box flexGrow={1} />
                       <IconButton 
                         size="small" 
-                        onClick={() => handlePlayTrack(track)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayTrack(track);
+                        }}
                         sx={{
                           bgcolor: 'rgba(255, 255, 255, 0.05)',
                           '&:hover': {
                             bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          },
+                          zIndex: 2,
+                          '&:active': {
+                            transform: 'scale(0.95)'
                           }
                         }}
                       >
@@ -342,102 +337,6 @@ function Home({ setCurrentTrack }) {
                   </Box>
                 </Box>
               </TrackCard>
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
-      
-      <Divider sx={{ my: 6, opacity: 0.6 }} />
-      
-      <Box>
-        <Stack 
-          direction="row" 
-          justifyContent="space-between" 
-          alignItems="center"
-          sx={{ mb: 3 }}
-        >
-          <SectionTitle>
-            <SectionIcon>
-              <AlbumIcon sx={{ color: 'white' }} />
-            </SectionIcon>
-            <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Recent Albums
-            </Typography>
-          </SectionTitle>
-          
-          <Button 
-            endIcon={<ChevronRightIcon />} 
-            component={RouterLink} 
-            to="/albums"
-            sx={{ textTransform: 'none' }}
-          >
-            Browse albums
-          </Button>
-        </Stack>
-        
-        <Grid container spacing={3}>
-          {recentAlbums.map((album) => (
-            <Grid item xs={12} sm={6} md={3} key={album.id}>
-              <AlbumCard>
-                <Box sx={{ position: 'relative' }}>
-                  <CardMedia
-                    component="img"
-                    height="180"
-                    image={album.cover_image}
-                    alt={album.title}
-                  />
-                  <Box sx={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: '50%',
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)',
-                  }} />
-                </Box>
-                <CardContent sx={{ position: 'relative', background: 'linear-gradient(135deg, rgba(35,35,45,1) 0%, rgba(25,25,35,1) 100%)' }}>
-                  <Link 
-                    component={RouterLink} 
-                    to={`/albums/${album.id}`}
-                    sx={{ textDecoration: 'none' }}
-                  >
-                    <Typography 
-                      variant="subtitle1" 
-                      component="div"
-                      sx={{ fontWeight: 500, color: 'text.primary' }}
-                    >
-                      {album.title}
-                    </Typography>
-                  </Link>
-                  <Typography 
-                    variant="subtitle2" 
-                    color="text.secondary"
-                    sx={{ 
-                      display: 'block',
-                      mt: 0.5,
-                      fontWeight: 400,
-                    }}
-                  >
-                    {album.artist}
-                  </Typography>
-                  <Typography 
-                    variant="caption" 
-                    color="text.secondary"
-                    sx={{ 
-                      position: 'absolute',
-                      top: 16,
-                      right: 16,
-                      bgcolor: 'rgba(0,0,0,0.4)',
-                      px: 1, 
-                      py: 0.5,
-                      borderRadius: 1,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {new Date(album.release_date).getFullYear()}
-                  </Typography>
-                </CardContent>
-              </AlbumCard>
             </Grid>
           ))}
         </Grid>

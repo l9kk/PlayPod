@@ -6,14 +6,15 @@ import {
   TextField,
   Button,
   Link,
-  Paper,
   Container,
   Avatar,
   Grid,
-  Alert
+  Alert,
+  Paper,
+  Divider
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import axios from 'axios';
+import authService from '../services/authService';
 
 function Login() {
   const [formData, setFormData] = useState({
@@ -44,93 +45,138 @@ function Login() {
     setError('');
     
     try {
-      //TODO: Replace with actual login API endpoint
-      setTimeout(() => {
-        localStorage.setItem('user', JSON.stringify({ 
-          username: formData.username, 
-          isLoggedIn: true 
-        }));
-        
-        navigate('/');
-        setLoading(false);
-      }, 1500);
+      await authService.login({
+        username: formData.username,
+        password: formData.password
+      });
+      
+      navigate('/');
     } catch (err) {
       console.error('Login error:', err);
       setError(err.response?.data?.detail || 'Login failed. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
+    <Container component="main" maxWidth="sm">
+      <Paper
+        elevation={3}
         sx={{
           mt: 8,
+          mb: 4,
+          p: 4,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
+          borderRadius: 2,
+          background: 'linear-gradient(135deg, rgba(30, 30, 40, 0.95) 0%, rgba(15, 15, 25, 0.95) 100%)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.05)'
         }}
       >
-        <Avatar sx={{ m: 1, bgcolor: 'primary.main' }}>
-          <LockOutlinedIcon />
-        </Avatar>
-        <Typography component="h1" variant="h5">
-          Sign in
-        </Typography>
-        
-        {error && (
-          <Alert severity="error" sx={{ width: '100%', mt: 2 }}>
-            {error}
-          </Alert>
-        )}
-        
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            id="username"
-            label="Username"
-            name="username"
-            autoComplete="username"
-            autoFocus
-            value={formData.username}
-            onChange={handleChange}
-            disabled={loading}
-          />
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            name="password"
-            label="Password"
-            type="password"
-            id="password"
-            autoComplete="current-password"
-            value={formData.password}
-            onChange={handleChange}
-            disabled={loading}
-          />
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            width: '100%',
+          }}
+        >
+          <Avatar sx={{ 
+            m: 1, 
+            bgcolor: 'primary.main',
+            width: 56,
+            height: 56,
+            boxShadow: '0 4px 12px rgba(29, 185, 84, 0.4)'
+          }}>
+            <LockOutlinedIcon fontSize="large" />
+          </Avatar>
+          <Typography component="h1" variant="h5" sx={{ mb: 1, fontWeight: 600 }}>
+            Welcome Back
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
+            Sign in to access your music and playlists
+          </Typography>
           
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            sx={{ mt: 3, mb: 2 }}
-            disabled={loading}
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </Button>
+          {error && (
+            <Alert severity="error" sx={{ width: '100%', mb: 3 }}>
+              {error}
+            </Alert>
+          )}
           
-          <Grid container justifyContent="flex-end">
-            <Grid item>
-              <Link component={RouterLink} to="/register" variant="body2">
-                {"Don't have an account? Sign up"}
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="username"
+              label="Username"
+              name="username"
+              autoComplete="username"
+              autoFocus
+              value={formData.username}
+              onChange={handleChange}
+              disabled={loading}
+              InputProps={{
+                sx: {
+                  borderRadius: 1.5,
+                  fontSize: '1rem',
+                  '& .MuiOutlinedInput-input': {
+                    padding: '16px 14px',
+                  }
+                }
+              }}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              name="password"
+              label="Password"
+              type="password"
+              id="password"
+              autoComplete="current-password"
+              value={formData.password}
+              onChange={handleChange}
+              disabled={loading}
+              InputProps={{
+                sx: {
+                  borderRadius: 1.5,
+                  fontSize: '1rem',
+                  '& .MuiOutlinedInput-input': {
+                    padding: '16px 14px',
+                  }
+                }
+              }}
+            />
+            
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              sx={{ mt: 4, mb: 2, py: 1.5, fontSize: '1rem', fontWeight: 600 }}
+              disabled={loading}
+              size="large"
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Button>
+            
+            <Divider sx={{ my: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                Don't have an account?
+              </Typography>
+            </Divider>
+            
+            <Box textAlign="center">
+              <Link component={RouterLink} to="/register" variant="body1" sx={{ fontWeight: 500 }}>
+                Sign up here
               </Link>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         </Box>
-      </Box>
+      </Paper>
     </Container>
   );
 }

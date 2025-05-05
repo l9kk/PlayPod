@@ -7,6 +7,7 @@ import Box from '@mui/material/Box'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
 import MusicPlayer from './components/MusicPlayer'
+import ErrorBoundary from './components/ErrorBoundary'
 
 import Home from './pages/Home'
 import Albums from './pages/Albums'
@@ -15,8 +16,10 @@ import Search from './pages/Search'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Favorites from './pages/Favorites'
+import History from './pages/History'
 import CreatePlaylist from './pages/CreatePlaylist'
 import PlayerScreen from './pages/PlayerScreen'
+import AllTracks from './pages/AllTracks'
 
 const darkTheme = createTheme({
   palette: {
@@ -111,7 +114,6 @@ const darkTheme = createTheme({
 
 function App() {
   const [currentTrack, setCurrentTrack] = useState(null);
-  // Load Google Fonts
   useEffect(() => {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -125,46 +127,86 @@ function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      <Router>
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          height: '100vh',
-          background: 'linear-gradient(135deg, #0A0E17 0%, #121A29 100%)',
-          backgroundAttachment: 'fixed'
-        }}>
-          <Navbar />
-          <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
-            <Sidebar />
-            <Box 
-              component="main" 
-              sx={{ 
-                flexGrow: 1, 
-                p: 3, 
-                overflow: 'auto',
-                backgroundImage: 'url("/subtle-pattern.png")',
-                backgroundBlendMode: 'soft-light',
-                backgroundSize: '200px',
-                backgroundAttachment: 'fixed',
-                backgroundRepeat: 'repeat',
-              }}
-            >
-              <Routes>
-                <Route path="/" element={<Home setCurrentTrack={setCurrentTrack} />} />
-                <Route path="/albums" element={<Albums />} />
-                <Route path="/albums/:id" element={<AlbumDetail setCurrentTrack={setCurrentTrack} />} />
-                <Route path="/search" element={<Search setCurrentTrack={setCurrentTrack} />} />
-                <Route path="/favorites" element={<Favorites setCurrentTrack={setCurrentTrack} />} />
-                <Route path="/create-playlist" element={<CreatePlaylist setCurrentTrack={setCurrentTrack} />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/player" element={<PlayerScreen />} />
-              </Routes>
+      <ErrorBoundary>
+        <Router>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            height: '100vh',
+            background: 'linear-gradient(135deg, #0A0E17 0%, #121A29 100%)',
+            backgroundAttachment: 'fixed'
+          }}>
+            <Navbar />
+            <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
+              <Sidebar />
+              <Box 
+                component="main" 
+                sx={{ 
+                  flexGrow: 1, 
+                  p: 3, 
+                  overflow: 'auto',
+                  backgroundImage: 'url("/subtle-pattern.png")',
+                  backgroundBlendMode: 'soft-light',
+                  backgroundSize: '200px',
+                  backgroundAttachment: 'fixed',
+                  backgroundRepeat: 'repeat',
+                }}
+              >
+                <Routes>
+                  <Route path="/" element={
+                    <ErrorBoundary title="Home Error" message="Failed to load home page content">
+                      <Home setCurrentTrack={setCurrentTrack} />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/tracks" element={
+                    <ErrorBoundary title="Tracks Error" message="Failed to load tracks">
+                      <AllTracks setCurrentTrack={setCurrentTrack} />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/albums" element={
+                    <ErrorBoundary title="Albums Error" message="Failed to load album list">
+                      <Albums />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/albums/:id" element={
+                    <ErrorBoundary title="Album Details Error" message="Failed to load album details">
+                      <AlbumDetail setCurrentTrack={setCurrentTrack} />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/search" element={
+                    <ErrorBoundary title="Search Error" message="Failed to perform search">
+                      <Search setCurrentTrack={setCurrentTrack} />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/favorites" element={
+                    <ErrorBoundary title="Favorites Error" message="Failed to load favorites">
+                      <Favorites setCurrentTrack={setCurrentTrack} />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/history" element={
+                    <ErrorBoundary title="History Error" message="Failed to load playback history">
+                      <History setCurrentTrack={setCurrentTrack} />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/create-playlist" element={
+                    <ErrorBoundary title="Playlist Error" message="Failed to manage playlists">
+                      <CreatePlaylist setCurrentTrack={setCurrentTrack} />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/player" element={
+                    <ErrorBoundary title="Player Error" message="Failed to load music player">
+                      <PlayerScreen />
+                    </ErrorBoundary>
+                  } />
+                </Routes>
+              </Box>
             </Box>
+            {currentTrack && <MusicPlayer track={currentTrack} />}
           </Box>
-          {currentTrack && <MusicPlayer track={currentTrack} />}
-        </Box>
-      </Router>
+        </Router>
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }

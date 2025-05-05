@@ -23,6 +23,9 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RepeatIcon from '@mui/icons-material/Repeat';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
+import LoginModal from '../components/LoginModal';
+import apiService from '../services/api';
+import authService from '../services/authService';
 
 function PlayerScreen() {
   const [track, setTrack] = useState(null);
@@ -32,6 +35,7 @@ function PlayerScreen() {
   const [volume, setVolume] = useState(70);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
   const audioRef = useRef(null);
   const navigate = useNavigate();
 
@@ -62,8 +66,18 @@ function PlayerScreen() {
     audioRef.current.addEventListener('timeupdate', updateTime);
     audioRef.current.addEventListener('ended', handleEnded);
 
-    const favorites = JSON.parse(localStorage.getItem('favorites')) || [];
-    setIsFavorite(favorites.some(fav => fav.id === track.id));
+    const checkFavorite = async () => {
+      if (authService.isLoggedIn()) {
+        try {
+          const isFav = await apiService.checkFavorite(track.id);
+          setIsFavorite(isFav);
+        } catch (error) {
+          console.error("Error checking favorite status:", error);
+        }
+      }
+    };
+    
+    checkFavorite();
 
     return () => {
       if (audioRef.current) {
@@ -123,20 +137,37 @@ function PlayerScreen() {
     setVolume(newValue);
   };
 
-  const toggleFavorite = () => {
+  const toggleFavorite = async () => {
     if (!track) return;
     
-    const favorites = JSON.parse(localStorage.getItem('favorites')) || [];
-    
-    if (isFavorite) {
-      const updatedFavorites = favorites.filter(fav => fav.id !== track.id);
-      localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
-    } else {
-      const updatedFavorites = [...favorites, track];
-      localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
+    if (!authService.isLoggedIn()) {
+      setLoginModalOpen(true);
+      return;
     }
     
-    setIsFavorite(!isFavorite);
+    try {
+      if (isFavorite) {
+        await apiService.removeFavorite(track.id);
+      } else {
+        await apiService.addFavorite(track);
+      }
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
+  };
+
+  const handleLoginModalClose = async (success) => {
+    setLoginModalOpen(false);
+    
+    if (success && track) {
+      try {
+        await apiService.addFavorite(track);
+        setIsFavorite(true);
+      } catch (error) {
+        console.error("Error adding to favorites after login:", error);
+      }
+    }
   };
 
   const formatTime = (time) => {
@@ -167,134 +198,142 @@ function PlayerScreen() {
   }
 
   return (
-    <Box sx={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      bgcolor: (theme) => theme.palette.mode === 'dark' ? '#121212' : '#f5f5f5'
-    }}>
-      <Box sx={{ p: 2 }}>
-        <IconButton onClick={goBack} edge="start">
-          <ArrowBackIcon />
-        </IconButton>
-      </Box>
+    <>
+      <Box sx={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        bgcolor: (theme) => theme.palette.mode === 'dark' ? '#121212' : '#f5f5f5'
+      }}>
+        <Box sx={{ p: 2 }}>
+          <IconButton onClick={goBack} edge="start">
+            <ArrowBackIcon />
+          </IconButton>
+        </Box>
 
-      <Container maxWidth="md" sx={{ flex: 1, display: 'flex', flexDirection: 'column', py: 4 }}>
-        <Grid container spacing={4}>
-          {/* Album Art */}
-          <Grid item xs={12} md={7} sx={{ textAlign: 'center' }}>
-            <Paper
-              elevation={6}
-              sx={{
-                overflow: 'hidden',
-                borderRadius: 2,
-                maxWidth: '100%',
-                width: '100%',
-                aspectRatio: '1/1',
-                mb: 4,
-                backgroundImage: `url(${track.cover_image || '/default-album.png'})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }}
-            />
-          </Grid>
-          
-          {/* Track Info and Controls */}
-          <Grid item xs={12} md={5}>
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h4" gutterBottom>
-                {track.title}
-              </Typography>
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                {track.artist}
-              </Typography>
-              {track.genre && (
-                <Typography variant="subtitle2" color="text.secondary">
-                  Genre: {track.genre}
+        <Container maxWidth="md" sx={{ flex: 1, display: 'flex', flexDirection: 'column', py: 4 }}>
+          <Grid container spacing={4}>
+            {/* Album Art */}
+            <Grid item xs={12} md={7} sx={{ textAlign: 'center' }}>
+              <Paper
+                elevation={6}
+                sx={{
+                  overflow: 'hidden',
+                  borderRadius: 2,
+                  maxWidth: '100%',
+                  width: '100%',
+                  aspectRatio: '1/1',
+                  mb: 4,
+                  backgroundImage: `url(${track.cover_image || '/default-album.png'})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              />
+            </Grid>
+            
+            {/* Track Info and Controls */}
+            <Grid item xs={12} md={5}>
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="h4" gutterBottom>
+                  {track.title}
                 </Typography>
-              )}
-            </Box>
-            
-            {/* Heart Button */}
-            <IconButton 
-              onClick={toggleFavorite}
-              sx={{ mb: 2, p: 1 }}
-              color={isFavorite ? "primary" : "default"}
-            >
-              {isFavorite ? <FavoriteIcon fontSize="large" /> : <FavoriteBorderIcon fontSize="large" />}
-            </IconButton>
-            
-            {/* Progress and Current Time */}
-            <Box sx={{ mb: 2 }}>
-              <Slider
-                value={currentTime}
-                min={0}
-                max={duration || 1}
-                onChange={handleTimeChange}
-                onMouseDown={handleDragStart}
-                onMouseUp={handleDragEnd}
-                onTouchStart={handleDragStart}
-                onTouchEnd={handleDragEnd}
-                aria-label="time-indicator"
-                sx={{ 
-                  height: 6,
-                  '& .MuiSlider-thumb': {
-                    width: 14,
-                    height: 14,
-                  }
-                }}
-              />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body2">{formatTime(currentTime)}</Typography>
-                <Typography variant="body2">{formatTime(duration)}</Typography>
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  {track.artist}
+                </Typography>
+                {track.genre && (
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Genre: {track.genre}
+                  </Typography>
+                )}
               </Box>
-            </Box>
-            
-            {/* Player Controls */}
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 4 }}>
-              <IconButton size="small">
-                <ShuffleIcon />
-              </IconButton>
-              <IconButton sx={{ mx: 1 }} size="large">
-                <SkipPreviousIcon fontSize="large" />
-              </IconButton>
+              
+              {/* Heart Button */}
               <IconButton 
-                onClick={handlePlayPause} 
-                sx={{ 
-                  mx: 2,
-                  bgcolor: 'primary.main',
-                  '&:hover': { bgcolor: 'primary.dark' },
-                  p: 2
-                }}
+                onClick={toggleFavorite}
+                sx={{ mb: 2, p: 1 }}
+                color={isFavorite ? "primary" : "default"}
               >
-                {isPlaying ? 
-                  <PauseIcon fontSize="large" sx={{ color: '#fff' }} /> : 
-                  <PlayArrowIcon fontSize="large" sx={{ color: '#fff' }} />
-                }
+                {isFavorite ? <FavoriteIcon fontSize="large" /> : <FavoriteBorderIcon fontSize="large" />}
               </IconButton>
-              <IconButton sx={{ mx: 1 }} size="large">
-                <SkipNextIcon fontSize="large" />
-              </IconButton>
-              <IconButton size="small">
-                <RepeatIcon />
-              </IconButton>
-            </Box>
-            
-            {/* Volume Control */}
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 4 }}>
-              <VolumeDownIcon />
-              <Slider
-                value={volume}
-                onChange={handleVolumeChange}
-                aria-label="Volume"
-                sx={{ flexGrow: 1 }}
-              />
-              <VolumeUpIcon />
-            </Stack>
+              
+              {/* Progress and Current Time */}
+              <Box sx={{ mb: 2 }}>
+                <Slider
+                  value={currentTime}
+                  min={0}
+                  max={duration || 1}
+                  onChange={handleTimeChange}
+                  onMouseDown={handleDragStart}
+                  onMouseUp={handleDragEnd}
+                  onTouchStart={handleDragStart}
+                  onTouchEnd={handleDragEnd}
+                  aria-label="time-indicator"
+                  sx={{ 
+                    height: 6,
+                    '& .MuiSlider-thumb': {
+                      width: 14,
+                      height: 14,
+                    }
+                  }}
+                />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2">{formatTime(currentTime)}</Typography>
+                  <Typography variant="body2">{formatTime(duration)}</Typography>
+                </Box>
+              </Box>
+              
+              {/* Player Controls */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 4 }}>
+                <IconButton size="small">
+                  <ShuffleIcon />
+                </IconButton>
+                <IconButton sx={{ mx: 1 }} size="large">
+                  <SkipPreviousIcon fontSize="large" />
+                </IconButton>
+                <IconButton 
+                  onClick={handlePlayPause} 
+                  sx={{ 
+                    mx: 2,
+                    bgcolor: 'primary.main',
+                    '&:hover': { bgcolor: 'primary.dark' },
+                    p: 2
+                  }}
+                >
+                  {isPlaying ? 
+                    <PauseIcon fontSize="large" sx={{ color: '#fff' }} /> : 
+                    <PlayArrowIcon fontSize="large" sx={{ color: '#fff' }} />
+                  }
+                </IconButton>
+                <IconButton sx={{ mx: 1 }} size="large">
+                  <SkipNextIcon fontSize="large" />
+                </IconButton>
+                <IconButton size="small">
+                  <RepeatIcon />
+                </IconButton>
+              </Box>
+              
+              {/* Volume Control */}
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 4 }}>
+                <VolumeDownIcon />
+                <Slider
+                  value={volume}
+                  onChange={handleVolumeChange}
+                  aria-label="Volume"
+                  sx={{ flexGrow: 1 }}
+                />
+                <VolumeUpIcon />
+              </Stack>
+            </Grid>
           </Grid>
-        </Grid>
-      </Container>
-    </Box>
+        </Container>
+      </Box>
+      
+      <LoginModal 
+        open={loginModalOpen} 
+        onClose={handleLoginModalClose} 
+        actionType="add to favorites"
+      />
+    </>
   );
 }
 
