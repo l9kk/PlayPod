@@ -22,6 +22,7 @@ const drawerWidth = 240;
 
 function Sidebar() {
   const theme = useTheme();
+  
   const location = useLocation();
   
   const isActive = (path) => location.pathname === path;
