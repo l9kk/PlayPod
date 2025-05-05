@@ -11,7 +11,6 @@ router = APIRouter()
 
 
 def get_password_hash(password: str) -> str:
-    # TODO: Use bcrypt or another hashing algorithm
     return hashlib.sha256(password.encode()).hexdigest()
 
 
